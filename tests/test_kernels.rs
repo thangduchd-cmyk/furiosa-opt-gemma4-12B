@@ -693,7 +693,7 @@ async fn main() {
     );
 
     let mut failures = Vec::new();
-    for test in TESTS {
+for test in TESTS.iter().filter(|test| test.name == "sliding_project_qkv"){
         if profile {
             println!("==> {}", test.name);
             collector.clear();

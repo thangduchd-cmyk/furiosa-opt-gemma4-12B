@@ -56,19 +56,22 @@ pub fn sliding_project_qkv(
     v_cache: &mut HbmTensor<bf16, Chip, m![Ts, Ns, Ds]>,
     q_out: &mut HbmTensor<bf16, Chip, m![Ns, Gs, Ds]>,
 ) {
-    let x: DmTensor<bf16, Chip, Cluster, Slice, m![H]> = x.to_dm(&mut ctx.tdma);
-    let x = shared::rmsnorm::normalize(ctx, &x, input_rms_weight);
-
-    let x: DmTensor<bf16, Chip, Cluster, Replicated, m![H]> = layout::broadcast_hidden(ctx, &x);
+    let x: DmTensor<bf16, Chip, m![1 #{!} 2], Slice, m![H]> = x.to_dm(&mut ctx.tdma);
+    let x_dist: DmTensor<bf16, Chip, m![Dummy2], Replicated, m![H]> =
+        shared::rmsnorm::normalize_replicated(ctx, &x, input_rms_weight);
 
     let q: DmTensor<bf16, Chip, Cluster, Slice, m![Ns, Gs, Ds]> =
-        sliding::projection::project_query(ctx, &x, q_weight, q_weight_scale);
-    let (k, v) = sliding::projection::project_key_value(ctx, &x, k_weight, v_weight, k_weight_scale, v_weight_scale);
+        sliding::projection::project_query_dist_f8_hbm(ctx, &x_dist, q_weight, q_weight_scale);
+    let k_dist = sliding::projection::project_value_dist4_raw(ctx, &x_dist, k_weight, k_weight_scale);
+    let v_dist = sliding::projection::project_value_dist4_raw(ctx, &x_dist, v_weight, v_weight_scale);
 
     let q: DmTensor<bf16, Chip, Cluster, Slice, m![Ns, Gs, Ds]> =
         sliding::rmsnorm::normalize_query(ctx, &q, q_rms_weight);
-    let k: DmTensor<bf16, Chip, Cluster, Slice, m![Ns, Ds]> = sliding::rmsnorm::normalize_key(ctx, &k, k_rms_weight);
-    let v: DmTensor<bf16, Chip, Cluster, Slice, m![Ns, Ds]> = sliding::rmsnorm::normalize_value(ctx, &v);
+    let k_dense = sliding::rmsnorm::normalize_key_dist4_via_pack(ctx, &k_dist, k_rms_weight);
+    let mut k_hbm: HbmTensor<bf16, Chip, m![Ns, Ds]> = HbmTensor::new();
+    k_dense.view().to_hbm_view(&mut ctx.tdma, k_hbm.view_mut());
+    let k: DmTensor<bf16, Chip, Cluster, Slice, m![Ns, Ds]> = k_hbm.to_dm(&mut ctx.tdma);
+    let v = sliding::rmsnorm::normalize_value_dist4_via_pack(ctx, &v_dist);
 
     let (q, k) = sliding::rope::apply_rope(ctx, &q, &k, rope_offset, cos, sin);
 

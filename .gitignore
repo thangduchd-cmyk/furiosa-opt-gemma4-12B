@@ -1,4 +1,23 @@
-target
+target/
 Cargo.lock
-/ref
-**/__pycache__
+/ref/
+**/__pycache__/
+*.log
+*.hw_*
+*.before_*
+*.cand_*
+*.wip_*
+*wip_sleep*
+*.fused_*
+*.mainbcast_*
+*.single_bcast_*
+*.subbcast*
+*.h4_*
+*.v0
+*.v3base
+sliding_project_qkv*.json
+# Local optimization experiments/checkpoints (extension-style backups)
+src/**/*.rs.*
+tests/**/*.rs.*
+# Accidental diagnostic filenames
+src/**/*.rs:*

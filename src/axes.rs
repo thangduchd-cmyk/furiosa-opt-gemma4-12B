@@ -24,6 +24,10 @@ axes![
     Pv = 1120,
     Aa = 640,
     Dummy2 = 2,
+    KvPair = 2,
+    I = 2,
     Dummy8 = 8,
+    Dummy16 = 16,
+    Dummy64 = 64,
     Dummy256 = 256,
 ];
